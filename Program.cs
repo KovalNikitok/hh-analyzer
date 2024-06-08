@@ -7,7 +7,6 @@ namespace hh_analyzer
 {
     public class Program
     {
-
         public static void Main(string[] args)
         {
             var builder = Host.CreateApplicationBuilder(args);
