@@ -1,11 +1,10 @@
-﻿using hh_analyzer.Abstractions;
-using hh_analyzer.HttpClients.HttpClientsSettings;
+﻿using hh_analyzer.Application.HttpClients.HttpClientsSettings;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 
-namespace hh_analyzer.HttpClients
+namespace hh_analyzer.Application.HttpClients
 {
-    public class HHApiClient : IHHApiClient
+    public class HHApiClient
     {
         private readonly HttpClient _httpClient;
 
@@ -15,8 +14,9 @@ namespace hh_analyzer.HttpClients
             _httpClient = httpClient;
             _apiSettings = apiSettingsOptions.Value;
 
-            httpClient.DefaultRequestHeaders.Authorization =
+            _httpClient.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", _apiSettings.AccessToken);
+            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(_apiSettings.Agent);
         }
     }
 }

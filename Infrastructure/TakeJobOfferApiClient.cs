@@ -3,10 +3,9 @@ using Microsoft.Extensions.Options;
 using System.Text;
 using System.Text.Json;
 using System.Net.Http.Json;
-using hh_analyzer.HttpClients.HttpClientsSettings;
-using hh_analyzer.Abstractions;
+using hh_analyzer.Application.Abstractions;
 
-namespace hh_analyzer.HttpClients
+namespace hh_analyzer.Infrastructure
 {
     public class TakeJobOfferApiClient : ITakeJobOfferApiClient
     {

@@ -1,6 +1,6 @@
 ﻿using hh_analyzer.Contracts;
 
-namespace hh_analyzer.Abstractions
+namespace hh_analyzer.Application.Abstractions
 {
     public interface ITakeJobOfferApiClient
     {

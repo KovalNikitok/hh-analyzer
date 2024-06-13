@@ -1,18 +1,20 @@
-using Microsoft.Extensions.Options;
-using System.Net.Http;
+using hh_analyzer.Application.Abstractions;
 
-namespace hh_analyzer.Services
+namespace hh_analyzer.Application
 {
-    public class HHAnalyzerService : BackgroundService
+    public class HHBackgroundService : BackgroundService
     {
-        private readonly ILogger<HHAnalyzerService> _logger;
-        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly ILogger<HHBackgroundService> _logger;
+        private readonly ITakeJobOfferApiClient _takeJobOfferApiClient;
+        private readonly IHHAnalyzer _hhAnalyzer;
 
-        public HHAnalyzerService(ILogger<HHAnalyzerService> logger,
-            IHttpClientFactory httpClientFactory)
+        public HHBackgroundService(ILogger<HHBackgroundService> logger,
+            ITakeJobOfferApiClient takeJobOfferApiClient,
+            IHHAnalyzer hhAnalyzer)
         {
             _logger = logger;
-            _httpClientFactory = httpClientFactory;
+            _takeJobOfferApiClient = takeJobOfferApiClient;
+            _hhAnalyzer = hhAnalyzer;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
