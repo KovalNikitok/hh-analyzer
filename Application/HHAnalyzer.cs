@@ -1,7 +1,9 @@
 ﻿using hh_analyzer.Application.Abstractions;
 using hh_analyzer.Application.HttpClients.HttpClientsSettings;
 using hh_analyzer.Domain;
+using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 
 namespace hh_analyzer.Application
 {
@@ -22,11 +24,20 @@ namespace hh_analyzer.Application
             _settings = settings;
         }
 
-        private string Link(string name, string description) =>
-            $"{_settings.ConnectionString}/vacancies?text=Name%3A%28\"{name}\"%29+and+DESCRIPTION%3A%28\"{description}\"%29+NOT+%D0%BC%D0%B5%D0%BD%D1%82%D0%BE%D1%80+NOT+Senior+not+%D0%9F%D1%80%D0%B5%D0%BF%D0%BE%D0%B4%D0%B0%D0%B2%D0%B0%D1%82%D0%B5%D0%BB%D1%8C+NOT+TechLead+NOT+%D1%82%D0%B5%D1%85%D0%BB%D0%B8%D0%B4&per_page=100";
+        private string Link(string name, string? description)
+        {
+            var link = new StringBuilder();
+
+            link.Append($"{_settings.ConnectionString}/vacancies?text=Name%3A%28\"{WebUtility.UrlEncode(name)}\"%29+");
+            if (!string.IsNullOrEmpty(description))
+                link.Append($"and+DESCRIPTION%3A%28\"{WebUtility.UrlEncode(description)}\"%29+");
+            link.Append("NOT+%D0%BC%D0%B5%D0%BD%D1%82%D0%BE%D1%80+NOT+Senior+not+%D0%9F%D1%80%D0%B5%D0%BF%D0%BE%D0%B4%D0%B0%D0%B2%D0%B0%D1%82%D0%B5%D0%BB%D1%8C+NOT+TechLead+NOT+%D1%82%D0%B5%D1%85%D0%BB%D0%B8%D0%B4&per_page=100");
+
+            return link.ToString();
+        }
 
         public async Task<Dictionary<string, int>?> GetSkillsWithMentionCountFacade(
-            string name, string description, CancellationToken cancellationToken)
+            string name, string? description, CancellationToken cancellationToken)
         {
             if (cancellationToken.IsCancellationRequested)
             {
@@ -38,11 +49,7 @@ namespace hh_analyzer.Application
             }
             if (string.IsNullOrWhiteSpace(name))
             {
-                throw new ArgumentNullException("name");
-            }
-            if (string.IsNullOrWhiteSpace(description))
-            {
-                throw new ArgumentNullException("description");
+                throw new ArgumentNullException(nameof(name));
             }
 
             bool isErrorLogLevelEnabled = _logger.IsEnabled(LogLevel.Error);
@@ -78,10 +85,10 @@ namespace hh_analyzer.Application
                 throw new NullReferenceException("'GetSkillsFromVacancies' is null");
             }
 
-            if (skillsList.Count == 0)
+            if (skillsList?.Count == 0)
                 return null;
 
-            var skillsWithMentions = GetSkillsMentionCount(skillsList);
+            var skillsWithMentions = GetSkillsMentionCount(skillsList!);
             if (_logger.IsEnabled(LogLevel.Information))
             {
                 foreach (var skill in skillsWithMentions)
@@ -97,7 +104,7 @@ namespace hh_analyzer.Application
 
 
         private async Task<Vacancies?> GetVacancies(
-            string name, string description, CancellationToken cancellationToken)
+            string name, string? description, CancellationToken cancellationToken)
         {
             if (cancellationToken.IsCancellationRequested)
             {
@@ -122,7 +129,7 @@ namespace hh_analyzer.Application
             return vacancies;
         }
         private async Task<List<int>?> GetVacanciesIdsByProfession(
-            Vacancies vacancies, string name, string description,
+            Vacancies vacancies, string name, string? description,
             CancellationToken cancellationToken)
         {
             if (cancellationToken.IsCancellationRequested)
@@ -139,7 +146,7 @@ namespace hh_analyzer.Application
             for (int i = 0; i < pages; i++)
             {
                 var response = await _httpClient.GetAsync(
-                    $"{Link(name, description)}&page={++i}",
+                    $"{Link(name, description)}&page={i + 1}",
                     cancellationToken);
                 response.EnsureSuccessStatusCode();
 
@@ -174,7 +181,7 @@ namespace hh_analyzer.Application
             foreach (var vacancyId in vacanciesIds)
             {
                 var response = await _httpClient.GetAsync(
-                    $"{_settings}/vacancies /{vacancyId}",
+                    $"{_settings.ConnectionString}/vacancies/{vacancyId}",
                     cancellationToken);
                 response.EnsureSuccessStatusCode();
 

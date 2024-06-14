@@ -4,10 +4,12 @@ namespace hh_analyzer.Application.Abstractions
 {
     public interface ITakeJobOfferApiClient
     {
-        Task<List<ProfessionRequest?>?> GetProfessionsAsync();
-        Task<List<SkillRequest?>?> GetSkillsAsync();
-        Task SendProfessionSkillsAsync(ProfessionRequest profession, ProfessionSkillResponse ps);
-        Task SendProfessionsSkillsAsync(ProfessionRequest profession, IEnumerable<ProfessionSkillResponse> psCollection);
-        Task SendSkillAsync(SkillResponse skill);
+        Task<List<ProfessionRequest?>?> GetProfessionsAsync(CancellationToken cancellationToken);
+        Task<List<ProfessionSkillWithNameRequest?>?> GetProfessionSkillWithName(ProfessionRequest profession, CancellationToken cancellationToken);
+        Task<List<SkillRequest?>?> GetSkillsAsync(CancellationToken cancellationToken);
+        Task<SkillRequest?> GetSkillByNameAsync(string name, CancellationToken cancellationToken);
+        Task SendNewProfessionSkillAsync(ProfessionRequest profession, ProfessionSkillResponse ps, CancellationToken cancellationToken);
+        Task SendUpdatedProfessionSkillAsync(ProfessionRequest profession, ProfessionSkillResponse ps, CancellationToken cancellationToken);
+        Task<Guid> SendNewSkillAsync(SkillResponse skill, CancellationToken cancellationToken);
     }
 }

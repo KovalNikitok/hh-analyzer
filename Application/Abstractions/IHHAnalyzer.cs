@@ -3,6 +3,6 @@
     public interface IHHAnalyzer
     {
         Task<Dictionary<string, int>?> GetSkillsWithMentionCountFacade(
-            string name, string description, CancellationToken cancellationToken);
+            string name, string? description, CancellationToken cancellationToken);
     }
 }
