@@ -1,4 +1,4 @@
-﻿namespace hh_analyzer.Infrastructure
+﻿namespace hh_analyzer.Infrastructure.Settings
 {
     public class TakeJobOfferApiSettings
     {

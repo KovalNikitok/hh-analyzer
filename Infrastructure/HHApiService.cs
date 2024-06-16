@@ -1,40 +1,43 @@
 ﻿using hh_analyzer.Application.Abstractions;
-using hh_analyzer.Application.HttpClients.HttpClientsSettings;
 using hh_analyzer.Domain;
-using System.Net;
-using System.Net.Http.Json;
+using Microsoft.Extensions.Options;
 using System.Text;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using hh_analyzer.Infrastructure.Settings;
 
-namespace hh_analyzer.Application
+namespace hh_analyzer.Infrastructure
 {
-    public class HHAnalyzer : IHHAnalyzer
+    public class HHApiService : IHHApiSerice, IDisposable
     {
-        private readonly ILogger<HHBackgroundService> _logger;
-        private readonly IHttpClientFactory _httpClientFactory;
+        private bool _disposed;
+
         private readonly HttpClient _httpClient;
+        private readonly ILogger<HHApiService> _logger;
         private readonly HHApiSettings _settings;
-
-        public HHAnalyzer(ILogger<HHBackgroundService> logger,
-            IHttpClientFactory httpClientFactory, HHApiSettings settings)
+        public HHApiService(
+            IHttpClientFactory httpClientFactory,
+            IOptions<HHApiSettings> apiSettingsOptions,
+            ILogger<HHApiService> logger)
         {
+            _httpClient = httpClientFactory.CreateClient();
+            _settings = apiSettingsOptions.Value;
             _logger = logger;
-            _httpClientFactory = httpClientFactory;
 
-            _httpClient = _httpClientFactory.CreateClient();
-            _settings = settings;
+            Initialize();
         }
 
-        private string Link(string name, string? description)
+        private void Initialize()
         {
-            var link = new StringBuilder();
+            _httpClient.BaseAddress = new Uri(_settings.ConnectionString);
+            _httpClient.Timeout = TimeSpan.FromSeconds(30);
 
-            link.Append($"{_settings.ConnectionString}/vacancies?text=Name%3A%28\"{WebUtility.UrlEncode(name)}\"%29+");
-            if (!string.IsNullOrEmpty(description))
-                link.Append($"and+DESCRIPTION%3A%28\"{WebUtility.UrlEncode(description)}\"%29+");
-            link.Append("NOT+%D0%BC%D0%B5%D0%BD%D1%82%D0%BE%D1%80+NOT+Senior+not+%D0%9F%D1%80%D0%B5%D0%BF%D0%BE%D0%B4%D0%B0%D0%B2%D0%B0%D1%82%D0%B5%D0%BB%D1%8C+NOT+TechLead+NOT+%D1%82%D0%B5%D1%85%D0%BB%D0%B8%D0%B4&per_page=100");
-
-            return link.ToString();
+            _httpClient.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", _settings.AccessToken);
+            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(_settings.Agent);
         }
+
 
         public async Task<Dictionary<string, int>?> GetSkillsWithMentionCountFacade(
             string name, string? description, CancellationToken cancellationToken)
@@ -118,7 +121,14 @@ namespace hh_analyzer.Application
             var response = await _httpClient.GetAsync(
                 Link(name, description),
                 cancellationToken);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                if (_logger.IsEnabled(LogLevel.Warning))
+                    _logger.LogWarning(
+                        message: $"[{DateTimeOffset.Now}] GetVacancies: " +
+                        $"{await response.Content.ReadAsStringAsync(cancellationToken)}");
+                return null;
+            }
 
             Vacancies? vacancies = await response.Content.ReadFromJsonAsync<Vacancies?>(
                 cancellationToken);
@@ -148,7 +158,14 @@ namespace hh_analyzer.Application
                 var response = await _httpClient.GetAsync(
                     $"{Link(name, description)}&page={i + 1}",
                     cancellationToken);
-                response.EnsureSuccessStatusCode();
+                if (!response.IsSuccessStatusCode)
+                {
+                    if (_logger.IsEnabled(LogLevel.Warning))
+                        _logger.LogWarning(
+                            message: $"[{DateTimeOffset.Now}] GetVacanciesIdsByProfession: " +
+                            $"{await response.Content.ReadAsStringAsync(cancellationToken)}");
+                    return null;
+                }
 
                 var currVacancies = await response.Content.ReadFromJsonAsync<Vacancies>(
                     cancellationToken);
@@ -181,9 +198,16 @@ namespace hh_analyzer.Application
             foreach (var vacancyId in vacanciesIds)
             {
                 var response = await _httpClient.GetAsync(
-                    $"{_settings.ConnectionString}/vacancies/{vacancyId}",
+                    $"{_httpClient.BaseAddress}/vacancies/{vacancyId}",
                     cancellationToken);
-                response.EnsureSuccessStatusCode();
+                if (!response.IsSuccessStatusCode)
+                {
+                    if (_logger.IsEnabled(LogLevel.Warning))
+                        _logger.LogWarning(
+                            message: $"[{DateTimeOffset.Now}] GetSkillsFromVacancies: " +
+                            $"{await response.Content.ReadAsStringAsync(cancellationToken)}");
+                    return null;
+                }
 
                 var detailedVacancy = await response.Content.ReadFromJsonAsync<DetailedVacancy>(
                     cancellationToken);
@@ -211,6 +235,37 @@ namespace hh_analyzer.Application
                 skillsMentionCount[skill.Name]++;
             }
             return skillsMentionCount;
+        }
+
+        private string Link(string name, string? description)
+        {
+            var link = new StringBuilder();
+            var encodedName = WebUtility.UrlEncode($"'{name}'");
+            link.Append($"{_httpClient.BaseAddress}/vacancies?text=Name%3A%28{encodedName}%29+");
+            if (!string.IsNullOrEmpty(description))
+            {
+                var encodedDescription = WebUtility.UrlEncode($"'{description}'");
+                link.Append($"and+DESCRIPTION%3A%28\"{encodedDescription}\"%29+");
+            }
+            link.Append("NOT+%D0%BC%D0%B5%D0%BD%D1%82%D0%BE%D1%80+NOT+Senior+not+%D0%9F%D1%80%D0%B5%D0%BF%D0%BE%D0%B4%D0%B0%D0%B2%D0%B0%D1%82%D0%B5%D0%BB%D1%8C+NOT+TechLead+NOT+%D1%82%D0%B5%D1%85%D0%BB%D0%B8%D0%B4&per_page=100");
+
+            return link.ToString();
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+        protected void Dispose(bool isDisposing)
+        {
+            if (_disposed)
+                return;
+
+            if (isDisposing)
+                _httpClient.Dispose();
+
+            _disposed = true;
         }
     }
 }

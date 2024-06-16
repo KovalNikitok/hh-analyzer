@@ -4,22 +4,35 @@ using Microsoft.Extensions.Options;
 using System.Text;
 using System.Text.Json;
 using System.Net.Http.Json;
+using hh_analyzer.Infrastructure.Settings;
+using System.Net.Http.Headers;
+using System.Runtime;
 
 namespace hh_analyzer.Infrastructure
 {
-    public class TakeJobOfferApiClient : ITakeJobOfferApiClient
+    public class TakeJobOfferApiService : ITakeJobOfferApiService, IDisposable
     {
+        private bool _disposed;
+
         private readonly HttpClient _httpClient;
         private readonly TakeJobOfferApiSettings _apiSettings;
-        private readonly ILogger<TakeJobOfferApiClient> _logger;
-        public TakeJobOfferApiClient(
-            HttpClient httpClient,
-            ILogger<TakeJobOfferApiClient> logger,
+        private readonly ILogger<TakeJobOfferApiService> _logger;
+        public TakeJobOfferApiService(
+            IHttpClientFactory httpClientFactory,
+            ILogger<TakeJobOfferApiService> logger,
             IOptions<TakeJobOfferApiSettings> apiSettingsOptions)
         {
-            _httpClient = httpClient;
+            _httpClient = httpClientFactory.CreateClient();
             _logger = logger;
             _apiSettings = apiSettingsOptions.Value;
+
+            Initialize();
+        }
+
+        private void Initialize()
+        {
+            _httpClient.BaseAddress = new Uri(_apiSettings.ConnectionString);
+            _httpClient.Timeout = TimeSpan.FromSeconds(120);
         }
 
         public async Task<List<ProfessionRequest?>?> GetProfessionsAsync(CancellationToken cancellationToken)
@@ -33,9 +46,16 @@ namespace hh_analyzer.Infrastructure
                 return null;
             }
             var response = await _httpClient.GetAsync(
-                $"{_apiSettings.ConnectionString}/professions",
+                $"{_httpClient.BaseAddress}/professions",
                 cancellationToken);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                if (_logger.IsEnabled(LogLevel.Warning))
+                    _logger.LogWarning(
+                        message: $"[{DateTimeOffset.Now}] GetProfessionsAsync: " +
+                        $"{await response.Content.ReadAsStringAsync(cancellationToken)}");
+                return null;
+            }
 
             return await response.Content.ReadFromJsonAsync<List<ProfessionRequest?>>(cancellationToken);
         }
@@ -54,9 +74,16 @@ namespace hh_analyzer.Infrastructure
             }
 
             var response = await _httpClient.GetAsync(
-                $"{_apiSettings.ConnectionString}/professions-skills/{profession.Id}/with-name",
+                $"{_httpClient.BaseAddress}/professions-skills/{profession.Id}/with-name",
                 cancellationToken);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                if (_logger.IsEnabled(LogLevel.Warning))
+                    _logger.LogWarning(
+                        message: $"[{DateTimeOffset.Now}] GetProfessionSkillWithName: " +
+                        $"{await response.Content.ReadAsStringAsync(cancellationToken)}");
+                return null;
+            }
 
             return await response.Content.ReadFromJsonAsync<List<ProfessionSkillWithNameRequest?>?>(cancellationToken);
         }
@@ -72,9 +99,16 @@ namespace hh_analyzer.Infrastructure
                 return null;
             }
             var response = await _httpClient.GetAsync(
-                $"{_apiSettings.ConnectionString}/skills",
+                $"{_httpClient.BaseAddress}/skills",
                 cancellationToken);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                if (_logger.IsEnabled(LogLevel.Warning))
+                    _logger.LogWarning(
+                        message: $"[{DateTimeOffset.Now}] GetSkillsAsync: " +
+                        $"{await response.Content.ReadAsStringAsync(cancellationToken)}");
+                return null;
+            }
 
             return await response.Content.ReadFromJsonAsync<List<SkillRequest?>>(cancellationToken);
         }
@@ -91,9 +125,16 @@ namespace hh_analyzer.Infrastructure
             }
 
             var response = await _httpClient.GetAsync(
-                $"{_apiSettings.ConnectionString}/skills/{name}",
+                $"{_httpClient.BaseAddress}/skills/{name}",
                 cancellationToken);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                if (_logger.IsEnabled(LogLevel.Warning))
+                    _logger.LogWarning(
+                        message: $"[{DateTimeOffset.Now}] GetSkillByNameAsync: " +
+                        $"{await response.Content.ReadAsStringAsync(cancellationToken)}");
+                return null;
+            }
 
             return await response.Content.ReadFromJsonAsync<SkillRequest>(cancellationToken);
         }
@@ -111,10 +152,17 @@ namespace hh_analyzer.Infrastructure
             var jsonSkill = JsonSerializer.Serialize(skill);
             var content = new StringContent(jsonSkill, Encoding.UTF8, "application/json");
             var response = await _httpClient.PostAsync(
-                $"{_apiSettings.ConnectionString}/skills",
+                $"{_httpClient.BaseAddress}/skills",
                 content,
                 cancellationToken);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                if (_logger.IsEnabled(LogLevel.Warning))
+                    _logger.LogWarning(
+                        message: $"[{DateTimeOffset.Now}] SendNewSkillAsync: " +
+                        $"{await response.Content.ReadAsStringAsync(cancellationToken)}");
+                return Guid.Empty;
+            }
 
             return await response.Content.ReadFromJsonAsync<Guid>(cancellationToken);
         }
@@ -135,10 +183,17 @@ namespace hh_analyzer.Infrastructure
             var jsonProfessionSkill = JsonSerializer.Serialize(ps);
             var content = new StringContent(jsonProfessionSkill, Encoding.UTF8, "application/json");
             var response = await _httpClient.PostAsync(
-                $"{_apiSettings.ConnectionString}/professions-skills/{profession.Id}",
+                $"{_httpClient.BaseAddress}/professions-skills/{profession.Id}",
                 content,
                 cancellationToken);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                if (_logger.IsEnabled(LogLevel.Warning))
+                    _logger.LogWarning(
+                        message: $"[{DateTimeOffset.Now}] SendNewSkillAsync: " +
+                        $"{await response.Content.ReadAsStringAsync(cancellationToken)}");
+                return;
+            }
         }
 
         public async Task SendUpdatedProfessionSkillAsync(
@@ -157,10 +212,33 @@ namespace hh_analyzer.Infrastructure
             var jsonProfessionSkill = JsonSerializer.Serialize(ps);
             var content = new StringContent(jsonProfessionSkill, Encoding.UTF8, "application/json");
             var response = await _httpClient.PutAsync(
-                $"{_apiSettings.ConnectionString}/professions-skills/{profession.Id}", 
+                $"{_httpClient.BaseAddress}/professions-skills/{profession.Id}", 
                 content, 
                 cancellationToken);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                if (_logger.IsEnabled(LogLevel.Warning))
+                    _logger.LogWarning(
+                        message: $"[{DateTimeOffset.Now}] SendNewSkillAsync: " +
+                        $"{await response.Content.ReadAsStringAsync(cancellationToken)}");
+                return;
+            }
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+        protected void Dispose(bool isDisposing)
+        {
+            if (_disposed)
+                return;
+
+            if (isDisposing)
+                _httpClient.Dispose();
+
+            _disposed = true;
         }
     }
 }

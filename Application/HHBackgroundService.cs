@@ -3,19 +3,22 @@ using hh_analyzer.Contracts;
 
 namespace hh_analyzer.Application
 {
-    public class HHBackgroundService : BackgroundService
+    public class HHBackgroundService : BackgroundService, IDisposable
     {
-        private readonly ILogger<HHBackgroundService> _logger;
-        private readonly ITakeJobOfferApiClient _takeJobOfferApiClient;
-        private readonly IHHAnalyzer _hhAnalyzer;
+        private bool _disposed;
 
-        public HHBackgroundService(ILogger<HHBackgroundService> logger,
-            ITakeJobOfferApiClient takeJobOfferApiClient,
-            IHHAnalyzer hhAnalyzer)
+        private readonly ILogger<HHBackgroundService> _logger;
+        private readonly ITakeJobOfferApiService _takeJobOfferApiService;
+        private readonly IHHApiSerice _hhApiService;
+
+        public HHBackgroundService(
+            IHHApiSerice hhApiService,
+            ITakeJobOfferApiService takeJobOfferApiService,
+            ILogger<HHBackgroundService> logger)
         {
             _logger = logger;
-            _takeJobOfferApiClient = takeJobOfferApiClient;
-            _hhAnalyzer = hhAnalyzer;
+            _takeJobOfferApiService = takeJobOfferApiService;
+            _hhApiService = hhApiService;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -28,18 +31,18 @@ namespace hh_analyzer.Application
                     _logger.LogInformation("[{time}] HHAnalyzerService running...", DateTimeOffset.Now);
 
                 // Get professions from takejoboffer api
-                var professions = await _takeJobOfferApiClient.GetProfessionsAsync(stoppingToken);
+                var professions = await _takeJobOfferApiService.GetProfessionsAsync(stoppingToken);
 
-                // If professions is null = wait 3 hours and repeat
+                // If professions is null than wait 3 hours and repeat
                 if (professions is null || professions.Count == 0)
                 {
-                    await Task.Delay(new TimeSpan(3, 0, 0), stoppingToken);
+                    await Task.Delay(TimeSpan.FromHours(3), stoppingToken);
                     continue;
                 }
 
                 foreach (var profession in professions)
                 {
-                    var skillsWithMentionCount = await _hhAnalyzer
+                    var skillsWithMentionCount = await _hhApiService
                         .GetSkillsWithMentionCountFacade(
                             profession!.Name,
                             profession.Description,
@@ -48,7 +51,7 @@ namespace hh_analyzer.Application
                     if (skillsWithMentionCount is null || skillsWithMentionCount.Count == 0)
                         continue;
 
-                    var professionSkillsWithName = await _takeJobOfferApiClient
+                    var professionSkillsWithName = await _takeJobOfferApiService
                         .GetProfessionSkillWithName(profession, stoppingToken);
 
                     // Update previous profession skills
@@ -62,7 +65,7 @@ namespace hh_analyzer.Application
                                     professionSkill.SkillId,
                                     professionSkill.MentionCount);
 
-                                await _takeJobOfferApiClient.SendUpdatedProfessionSkillAsync(
+                                await _takeJobOfferApiService.SendUpdatedProfessionSkillAsync(
                                     profession,
                                     professionSkillResponse,
                                     stoppingToken);
@@ -76,29 +79,51 @@ namespace hh_analyzer.Application
                     // Added new skills (if needed) and profession skills
                     foreach (var skill in skillsWithMentionCount)
                     {
-                        var skillRequest = await _takeJobOfferApiClient.GetSkillByNameAsync(
+                        var skillRequest = await _takeJobOfferApiService.GetSkillByNameAsync(
                             skill.Key,
                             stoppingToken);
 
                         Guid skillId = skillRequest?.Id ?? Guid.Empty;
                         if (skillRequest is null)
-                            skillId = await _takeJobOfferApiClient.SendNewSkillAsync(
+                            skillId = await _takeJobOfferApiService.SendNewSkillAsync(
                                 new SkillResponse(skill.Key),
                                 stoppingToken);
 
                         if (skillId == Guid.Empty)
                             continue;
 
-                        await _takeJobOfferApiClient.SendNewProfessionSkillAsync(
+                        await _takeJobOfferApiService.SendNewProfessionSkillAsync(
                             profession,
                             new ProfessionSkillResponse(skillId, skill.Value),
                             stoppingToken);
                     }
                 }
 
-                // Setting a pause with time offset on 1 day
-                await Task.Delay(new TimeSpan(1, 0, 0, 0), stoppingToken);
+                if (isInfoLogLevelEnabled)
+                    _logger.LogInformation("[{time}] HHAnalyzerService ended...", DateTimeOffset.Now);
+                // 1 day delay before next HHBackgroundService service start
+                await Task.Delay(TimeSpan.FromDays(1), stoppingToken);
             }
+        }
+        
+        public override void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+        protected virtual void Dispose(bool isDisposing)
+        {
+            if (_disposed)
+                return;
+
+            if (isDisposing)
+            {
+                _takeJobOfferApiService.Dispose();
+                _hhApiService.Dispose();
+                base.Dispose();
+            }
+
+            _disposed = true;
         }
     }
 }

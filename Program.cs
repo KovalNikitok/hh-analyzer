@@ -1,8 +1,7 @@
 using hh_analyzer.Application;
 using hh_analyzer.Application.Abstractions;
-using hh_analyzer.Application.HttpClients;
-using hh_analyzer.Application.HttpClients.HttpClientsSettings;
 using hh_analyzer.Infrastructure;
+using hh_analyzer.Infrastructure.Settings;
 
 namespace hh_analyzer
 {
@@ -19,10 +18,10 @@ namespace hh_analyzer
                 builder.Configuration.GetSection(nameof(TakeJobOfferApiSettings))
             );
 
-            builder.Services.AddHttpClient<HHApiClient>();
+            builder.Services.AddHttpClient();
 
-            builder.Services.AddScoped<ITakeJobOfferApiClient, TakeJobOfferApiClient>();
-            builder.Services.AddScoped<IHHAnalyzer, HHAnalyzer>();
+            builder.Services.AddSingleton<IHHApiSerice, HHApiService>();
+            builder.Services.AddSingleton<ITakeJobOfferApiService, TakeJobOfferApiService>();
 
             builder.Services.AddHostedService<HHBackgroundService>();
 

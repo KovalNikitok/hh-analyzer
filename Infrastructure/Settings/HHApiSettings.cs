@@ -1,4 +1,4 @@
-﻿namespace hh_analyzer.Application.HttpClients.HttpClientsSettings
+﻿namespace hh_analyzer.Infrastructure.Settings
 {
     public class HHApiSettings
     {
