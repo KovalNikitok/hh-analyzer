@@ -1,5 +1,6 @@
 using hh_analyzer.Application.Abstractions;
 using hh_analyzer.Contracts;
+using hh_analyzer.Domain;
 
 namespace hh_analyzer.Application
 {
@@ -76,19 +77,20 @@ namespace hh_analyzer.Application
                         }
                     }
 
+                    // Remove skills with mentions lesser then 'requiredMentionsCount'
+                    int requiredMentionsCount = 2;
+                    int skillsWithMentions = GetSkillsWithMentionsGreaterThen(
+                        requiredMentionsCount,
+                        skillsWithMentionCount);
+
+                    // Break, if no one skill have at least 'requiredMentionsCount' mentions
+                    if (skillsWithMentions < 1)
+                        break;
+
                     // Added new skills (if needed) and profession skills
                     foreach (var skill in skillsWithMentionCount)
                     {
-                        var skillRequest = await _takeJobOfferApiService.GetSkillByNameAsync(
-                            skill.Key,
-                            stoppingToken);
-
-                        Guid skillId = skillRequest?.Id ?? Guid.Empty;
-                        if (skillRequest is null)
-                            skillId = await _takeJobOfferApiService.SendNewSkillAsync(
-                                new SkillResponse(skill.Key),
-                                stoppingToken);
-
+                        Guid skillId = await GetSkillByNameAsync(skill.Key, stoppingToken);
                         if (skillId == Guid.Empty)
                             continue;
 
@@ -106,6 +108,43 @@ namespace hh_analyzer.Application
             }
         }
         
+        private async Task<Guid> GetSkillByNameAsync(string skillName, CancellationToken cancellationToken)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                if (_logger.IsEnabled(LogLevel.Error))
+                    _logger.LogError(
+                        "[{time}] Service-GetSkillByNameAsync: CancellationTokenRequested",
+                        DateTimeOffset.Now);
+                return Guid.Empty;
+            }
+
+            var skillRequest = await _takeJobOfferApiService.GetSkillByNameAsync(
+                            skillName,
+                            cancellationToken);
+
+            Guid skillId = skillRequest?.Id ?? Guid.Empty;
+            if (skillRequest is null)
+                skillId = await _takeJobOfferApiService.SendNewSkillAsync(
+                    new SkillResponse(skillName),
+                    cancellationToken);
+
+            return skillId;
+        }
+
+        private static int GetSkillsWithMentionsGreaterThen(
+            int mentionsCount, 
+            Dictionary<string, int> skillsWithMentionCount)
+        {
+            foreach (var skill in skillsWithMentionCount)
+            {
+                if(skill.Value <= mentionsCount)
+                    skillsWithMentionCount.Remove(skill.Key);
+            }
+
+            return skillsWithMentionCount.Count;
+        }
+
         public override void Dispose()
         {
             Dispose(true);
