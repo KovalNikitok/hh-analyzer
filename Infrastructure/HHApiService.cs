@@ -6,12 +6,17 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using hh_analyzer.Infrastructure.Settings;
+using System.Text.Json.Serialization;
+using System.Text.Json;
+using System.Text.Encodings.Web;
 
 namespace hh_analyzer.Infrastructure
 {
     public class HHApiService : IHHApiSerice, IDisposable
     {
         private bool _disposed;
+        private readonly JsonSerializerOptions _serializerOptions;
+
 
         private readonly HttpClient _httpClient;
         private readonly ILogger<HHApiService> _logger;
@@ -24,6 +29,20 @@ namespace hh_analyzer.Infrastructure
             _httpClient = httpClientFactory.CreateClient();
             _settings = apiSettingsOptions.Value;
             _logger = logger;
+
+            _serializerOptions = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                Converters =
+                {
+                    new Int32Converter(),
+                    new DateTimeConverter(),
+                    new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)
+                },
+                AllowTrailingCommas = true,
+                ReadCommentHandling = JsonCommentHandling.Skip,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            };
 
             Initialize();
         }
@@ -97,7 +116,7 @@ namespace hh_analyzer.Infrastructure
                 foreach (var skill in skillsWithMentions)
                 {
                     _logger.LogInformation(
-                        "[{time}] GetSkillsMentionCount: skill: {skill} - metions: {mentionCount}",
+                        "[{time}] GetSkillsMentionCount: skill: {skill} - mentions: {mentionCount}",
                         DateTimeOffset.Now, skill.Key, skill.Value);
                 }
             }
@@ -131,6 +150,7 @@ namespace hh_analyzer.Infrastructure
             }
 
             Vacancies? vacancies = await response.Content.ReadFromJsonAsync<Vacancies?>(
+                _serializerOptions,
                 cancellationToken);
 
             if (vacancies is null || vacancies?.Items is null || vacancies?.Items.Count == 0)
@@ -168,6 +188,7 @@ namespace hh_analyzer.Infrastructure
                 }
 
                 var currVacancies = await response.Content.ReadFromJsonAsync<Vacancies>(
+                    _serializerOptions,
                     cancellationToken);
 
                 var itemsList = currVacancies?.Items;
@@ -198,7 +219,7 @@ namespace hh_analyzer.Infrastructure
             foreach (var vacancyId in vacanciesIds)
             {
                 var response = await _httpClient.GetAsync(
-                    $"{_httpClient.BaseAddress}/vacancies/{vacancyId}",
+                    $"{_httpClient.BaseAddress}vacancies/{vacancyId}",
                     cancellationToken);
                 if (!response.IsSuccessStatusCode)
                 {
@@ -210,17 +231,19 @@ namespace hh_analyzer.Infrastructure
                 }
 
                 var detailedVacancy = await response.Content.ReadFromJsonAsync<DetailedVacancy>(
+                    _serializerOptions,
                     cancellationToken);
 
                 if (response is null || detailedVacancy?.Skills is null)
                     continue;
 
-                skills.AddRange(detailedVacancy.Skills);
-
-                if (isInfoLogLevelEnabled)
+                if (detailedVacancy.Skills.Count > 0)
+                {
+                    skills.AddRange(detailedVacancy.Skills);
                     _logger.LogInformation(
                         "[{time}] GetSkillsFromVacancies: {skills}",
-                        DateTimeOffset.Now, detailedVacancy?.Skills);
+                        DateTimeOffset.Now, string.Join(", ", detailedVacancy?.Skills!));
+                }
             }
             return skills;
         }
@@ -241,7 +264,7 @@ namespace hh_analyzer.Infrastructure
         {
             var link = new StringBuilder();
             var encodedName = WebUtility.UrlEncode($"'{name}'");
-            link.Append($"{_httpClient.BaseAddress}/vacancies?text=Name%3A%28{encodedName}%29+");
+            link.Append($"{_httpClient.BaseAddress}vacancies?text=Name%3A%28{encodedName}%29+");
 
             /* Uncomment, if needed (!)
             if (!string.IsNullOrEmpty(description))
