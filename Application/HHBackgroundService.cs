@@ -1,6 +1,6 @@
 using hh_analyzer.Application.Abstractions;
 using hh_analyzer.Contracts;
-using hh_analyzer.Domain;
+using System.Threading;
 
 namespace hh_analyzer.Application
 {
@@ -56,7 +56,7 @@ namespace hh_analyzer.Application
                         .GetProfessionSkillWithName(profession, stoppingToken);
 
                     // Update previous profession skills
-                    if (professionSkillsWithName is not null || professionSkillsWithName!.Count > 0)
+                    if (professionSkillsWithName is not null || professionSkillsWithName?.Count > 0)
                     {
                         foreach (var professionSkill in professionSkillsWithName)
                         {
@@ -90,7 +90,14 @@ namespace hh_analyzer.Application
                     // Added new skills (if needed) and profession skills
                     foreach (var skill in skillsWithMentionCount)
                     {
-                        Guid skillId = await GetSkillByNameAsync(skill.Key, stoppingToken);
+                        var skillRequest = await GetSkillByNameAsync(skill.Key, stoppingToken);
+
+                        Guid skillId = skillRequest?.Id ?? Guid.Empty;
+                        if (skillRequest is null)
+                            skillId = await _takeJobOfferApiService.SendNewSkillAsync(
+                                new SkillResponse(skill.Key),
+                                stoppingToken);
+
                         if (skillId == Guid.Empty)
                             continue;
 
@@ -98,7 +105,13 @@ namespace hh_analyzer.Application
                             profession,
                             new ProfessionSkillResponse(skillId, skill.Value),
                             stoppingToken);
+
+                        // Load balancing with waiting 50ms every sended skill for a specific profession
+                        await Task.Delay(TimeSpan.FromMilliseconds(100), stoppingToken);
                     }
+
+                    // Load balancing with waiting 3s every processed profession
+                    await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken);
                 }
 
                 if (isInfoLogLevelEnabled)
@@ -108,7 +121,7 @@ namespace hh_analyzer.Application
             }
         }
         
-        private async Task<Guid> GetSkillByNameAsync(string skillName, CancellationToken cancellationToken)
+        private async Task<SkillRequest?> GetSkillByNameAsync(string skillName, CancellationToken cancellationToken)
         {
             if (cancellationToken.IsCancellationRequested)
             {
@@ -116,20 +129,14 @@ namespace hh_analyzer.Application
                     _logger.LogError(
                         "[{time}] Service-GetSkillByNameAsync: CancellationTokenRequested",
                         DateTimeOffset.Now);
-                return Guid.Empty;
+                return null;
             }
 
             var skillRequest = await _takeJobOfferApiService.GetSkillByNameAsync(
                             skillName,
                             cancellationToken);
 
-            Guid skillId = skillRequest?.Id ?? Guid.Empty;
-            if (skillRequest is null)
-                skillId = await _takeJobOfferApiService.SendNewSkillAsync(
-                    new SkillResponse(skillName),
-                    cancellationToken);
-
-            return skillId;
+            return skillRequest;
         }
 
         private static int GetSkillsWithMentionsGreaterThen(
