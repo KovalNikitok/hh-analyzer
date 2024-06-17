@@ -106,7 +106,7 @@ namespace hh_analyzer.Application
                             new ProfessionSkillResponse(skillId, skill.Value),
                             stoppingToken);
 
-                        // Load balancing with waiting 50ms every sended skill for a specific profession
+                        // Load balancing with waiting 100ms every sended skill for a specific profession
                         await Task.Delay(TimeSpan.FromMilliseconds(100), stoppingToken);
                     }
 
