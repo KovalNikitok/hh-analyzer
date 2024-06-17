@@ -242,11 +242,14 @@ namespace hh_analyzer.Infrastructure
             var link = new StringBuilder();
             var encodedName = WebUtility.UrlEncode($"'{name}'");
             link.Append($"{_httpClient.BaseAddress}/vacancies?text=Name%3A%28{encodedName}%29+");
+
+            /* Uncomment, if needed (!)
             if (!string.IsNullOrEmpty(description))
             {
                 var encodedDescription = WebUtility.UrlEncode($"'{description}'");
                 link.Append($"and+DESCRIPTION%3A%28\"{encodedDescription}\"%29+");
             }
+            */
             link.Append("NOT+%D0%BC%D0%B5%D0%BD%D1%82%D0%BE%D1%80+NOT+Senior+not+%D0%9F%D1%80%D0%B5%D0%BF%D0%BE%D0%B4%D0%B0%D0%B2%D0%B0%D1%82%D0%B5%D0%BB%D1%8C+NOT+TechLead+NOT+%D1%82%D0%B5%D1%85%D0%BB%D0%B8%D0%B4&per_page=100");
 
             return link.ToString();
