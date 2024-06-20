@@ -110,8 +110,8 @@ namespace hh_analyzer.Application
                         await Task.Delay(TimeSpan.FromMilliseconds(100), stoppingToken);
                     }
 
-                    // Load balancing with waiting 3s every processed profession
-                    await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken);
+                    // Load balancing with waiting 3m every processed profession
+                    await Task.Delay(TimeSpan.FromMinutes(3), stoppingToken);
                 }
 
                 if (isInfoLogLevelEnabled)

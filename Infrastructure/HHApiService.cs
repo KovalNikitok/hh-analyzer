@@ -173,6 +173,11 @@ namespace hh_analyzer.Infrastructure
 
             var vacanciesIds = new List<int>();
             var pages = vacancies.Pages;
+
+            // Free version of access to hh api has 2k vacancy request limit
+            if (pages > 10)
+                pages = 10;
+
             for (int i = 0; i < pages; i++)
             {
                 var response = await _httpClient.GetAsync(
