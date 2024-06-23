@@ -28,8 +28,9 @@ namespace hh_analyzer.Application
 
             while (!stoppingToken.IsCancellationRequested)
             {
+                var serviceStartTime = DateTime.Now.TimeOfDay;
                 if (isInfoLogLevelEnabled)
-                    _logger.LogInformation("[{time}] HHAnalyzerService running...", DateTimeOffset.Now);
+                    _logger.LogInformation("[{time}] HHAnalyzerService running at...", DateTimeOffset.Now);
 
                 // Get professions from takejoboffer api
                 var professions = await _takeJobOfferApiService.GetProfessionsAsync(stoppingToken);
@@ -55,13 +56,30 @@ namespace hh_analyzer.Application
                     var professionSkillsWithName = await _takeJobOfferApiService
                         .GetProfessionSkillWithName(profession, stoppingToken);
 
-                    // Update previous profession skills
+                    int requiredMentionsCount = 2;
+
+                    // Update existing profession skills
                     if (professionSkillsWithName is not null || professionSkillsWithName?.Count > 0)
                     {
                         foreach (var professionSkill in professionSkillsWithName)
                         {
                             if (skillsWithMentionCount.ContainsKey(professionSkill!.Name))
                             {
+                                // Remove processed profession skills
+                                skillsWithMentionCount.Remove(professionSkill!.Name);
+
+                                if (professionSkill.MentionCount < requiredMentionsCount)
+                                {
+                                    var professionSkillRequest = new ProfessionSkillRequest(professionSkill!.SkillId);
+
+                                    await _takeJobOfferApiService.RemoveProfessionSkillAsync(
+                                        profession,
+                                        professionSkillRequest,
+                                        stoppingToken);
+
+                                    continue;
+                                }
+
                                 var professionSkillResponse = new ProfessionSkillResponse(
                                     professionSkill.SkillId,
                                     professionSkill.MentionCount);
@@ -70,22 +88,19 @@ namespace hh_analyzer.Application
                                     profession,
                                     professionSkillResponse,
                                     stoppingToken);
-
-                                // Remove processed profession skills
-                                skillsWithMentionCount.Remove(professionSkill!.Name);
                             }
                         }
                     }
 
                     // Remove skills with mentions lesser then 'requiredMentionsCount'
-                    int requiredMentionsCount = 2;
+                    
                     int skillsWithMentions = GetSkillsWithMentionsGreaterThen(
                         requiredMentionsCount,
                         skillsWithMentionCount);
 
-                    // Break, if no one skill have at least 'requiredMentionsCount' mentions
+                    // Continue to next profession, if no one skill have at least 'requiredMentionsCount' mentions
                     if (skillsWithMentions < 1)
-                        break;
+                        continue;
 
                     // Added new skills (if needed) and profession skills
                     foreach (var skill in skillsWithMentionCount)
@@ -93,6 +108,7 @@ namespace hh_analyzer.Application
                         var skillRequest = await GetSkillByNameAsync(skill.Key, stoppingToken);
 
                         Guid skillId = skillRequest?.Id ?? Guid.Empty;
+
                         if (skillRequest is null)
                             skillId = await _takeJobOfferApiService.SendNewSkillAsync(
                                 new SkillResponse(skill.Key),
@@ -111,13 +127,17 @@ namespace hh_analyzer.Application
                     }
 
                     // Load balancing with waiting 3m every processed profession
-                    await Task.Delay(TimeSpan.FromMinutes(3), stoppingToken);
+                    await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
                 }
 
+                TimeSpan serviceEndTime = DateTime.Now.TimeOfDay;
+                TimeSpan duration = serviceEndTime - serviceStartTime;
+
                 if (isInfoLogLevelEnabled)
-                    _logger.LogInformation("[{time}] HHAnalyzerService ended...", DateTimeOffset.Now);
+                    _logger.LogInformation("[{time}] HHAnalyzerService ended, working time is {duration}...", DateTimeOffset.Now, duration);
+
                 // 1 day delay before next HHBackgroundService service start
-                await Task.Delay(TimeSpan.FromDays(1), stoppingToken);
+                await Task.Delay(TimeSpan.FromDays(1) - duration, stoppingToken);
             }
         }
         

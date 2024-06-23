@@ -11,7 +11,7 @@ namespace hh_analyzer.Application.Abstractions
         Task SendNewProfessionSkillAsync(ProfessionRequest profession, ProfessionSkillResponse ps, CancellationToken cancellationToken);
         Task SendUpdatedProfessionSkillAsync(ProfessionRequest profession, ProfessionSkillResponse ps, CancellationToken cancellationToken);
         Task<Guid> SendNewSkillAsync(SkillResponse skill, CancellationToken cancellationToken);
-
+        Task RemoveProfessionSkillAsync(ProfessionRequest profession,ProfessionSkillRequest ps,CancellationToken cancellationToken);
         void Dispose();
     }
 }

@@ -175,8 +175,8 @@ namespace hh_analyzer.Infrastructure
             var pages = vacancies.Pages;
 
             // Free version of access to hh api has 2k vacancy request limit
-            if (pages > 10)
-                pages = 10;
+            if (pages > 5)
+                pages = 5;
 
             for (int i = 0; i < pages; i++)
             {

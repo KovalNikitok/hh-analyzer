@@ -225,6 +225,34 @@ namespace hh_analyzer.Infrastructure
             }
         }
 
+        public async Task RemoveProfessionSkillAsync(
+            ProfessionRequest profession,
+            ProfessionSkillRequest ps,
+            CancellationToken cancellationToken)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                if (_logger.IsEnabled(LogLevel.Error))
+                    _logger.LogError(
+                        "[{time}] RemoveProfessionSkillAsync: CancellationTokenRequested",
+                        DateTimeOffset.Now);
+                return;
+            }
+
+            var response = await _httpClient.DeleteAsync(
+                $"{_httpClient.BaseAddress}/professions-skills/{profession.Id}/{ps.SkillId}",
+                cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                if (_logger.IsEnabled(LogLevel.Warning))
+                    _logger.LogWarning(
+                        message: $"[{DateTimeOffset.Now}] RemoveProfessionSkillAsync: " +
+                        $"{await response.Content.ReadAsStringAsync(cancellationToken)}");
+                return;
+            }
+        }
+
         public void Dispose()
         {
             Dispose(true);
