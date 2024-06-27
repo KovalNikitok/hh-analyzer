@@ -6,6 +6,7 @@
 - .NET 6.0 или выше
 - Docker
 - Зарегистрируйте приложение на [HeadHunter](https://dev.hh.ru/admin)
+- Разверните свой сервис '[TakeJobOffer](https://github.com/KovalNikitok/TakeJobOffer)'
 
 ## Установка
 1. Клонируйте репозиторий:
