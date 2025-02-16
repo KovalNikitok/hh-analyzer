@@ -4,6 +4,9 @@ using System.Globalization;
 
 namespace hh_analyzer.Infrastructure.Settings
 {
+    /// <summary>
+    /// Реализация конвертера для соответственного преобразования Json строк, как DateTime
+    /// </summary>
     public class DateTimeConverter : JsonConverter<DateTime>
     {
         // DateTime format at api.hh.ru responses

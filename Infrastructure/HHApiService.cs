@@ -1,14 +1,13 @@
 ﻿using hh_analyzer.Application.Abstractions;
 using hh_analyzer.Domain;
+using hh_analyzer.Infrastructure.Settings;
 using Microsoft.Extensions.Options;
-using System.Text;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using hh_analyzer.Infrastructure.Settings;
-using System.Text.Json.Serialization;
+using System.Text;
 using System.Text.Json;
-using System.Text.Encodings.Web;
+using System.Text.Json.Serialization;
 
 namespace hh_analyzer.Infrastructure
 {

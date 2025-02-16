@@ -1,12 +1,10 @@
-﻿using hh_analyzer.Contracts;
-using hh_analyzer.Application.Abstractions;
+﻿using hh_analyzer.Application.Abstractions;
+using hh_analyzer.Contracts;
+using hh_analyzer.Infrastructure.Settings;
 using Microsoft.Extensions.Options;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
-using System.Net.Http.Json;
-using hh_analyzer.Infrastructure.Settings;
-using System.Net.Http.Headers;
-using System.Runtime;
 
 namespace hh_analyzer.Infrastructure
 {

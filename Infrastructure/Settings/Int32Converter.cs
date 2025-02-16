@@ -3,7 +3,10 @@ using System.Text.Json.Serialization;
 
 namespace hh_analyzer.Infrastructure.Settings
 {
-    internal class Int32Converter : JsonConverter<int>
+    /// <summary>
+    /// Реализация конвертера для соответственного преобразования Json строк, как Int32
+    /// </summary>
+    public class Int32Converter : JsonConverter<int>
     {
         public override int Read(
             ref Utf8JsonReader reader,
